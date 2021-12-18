@@ -14,8 +14,7 @@ jobs:
       # TODO: what exactly???
       - name: Buildroot deps
         run: |
-          sudo apt-get update && sudo apt-get upgrade
-          sudo apt-get install curl build-essential perl make binutils
+          sudo apt-get update && sudo apt-get install curl build-essential perl make binutils
       - name: cache toolchain
         id: toolchain-cache
         uses: actions/cache@v2
