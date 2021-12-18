@@ -10,11 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # TODO: cache
-      # TODO: what exactly???
-      - name: Buildroot deps
-        run: |
-          sudo apt-get update && sudo apt-get install curl build-essential perl make binutils
       - name: cache toolchain
         id: toolchain-cache
         uses: actions/cache@v2
@@ -38,4 +33,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: images
-          path: buildroot-$BUILDROOT_VERSION/output/images
+          path: buildroot-${{ env.BUILDROOT_VERSION }}/output/images
