@@ -29,6 +29,7 @@ jobs:
         run: |
           cd buildroot-$BUILDROOT_VERSION
           cat ../basedefconfig ../defconfig >defconfig
+          make BR2_DEFCONFIG=defconfig defconfig
           make
       - name: save results
         uses: actions/upload-artifact@v2
