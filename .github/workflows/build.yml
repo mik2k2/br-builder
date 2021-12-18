@@ -21,7 +21,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: buildroot-${{ env.BUILDROOT_VERSION }}
-          key: ${{ env.BUILDROOT_VERSION }}-${{ hashFiles('basedefconfig')
+          key: ${{ env.BUILDROOT_VERSION }}-${{ hashFiles('basedefconfig') }}
       - name: get Buildroot and build toolchain
         if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
