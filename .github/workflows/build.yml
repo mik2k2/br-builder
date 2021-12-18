@@ -28,6 +28,7 @@ jobs:
       - name: build everything
         run: |
           cd buildroot-$BUILDROOT_VERSION
+          cat ../basedefconfig ../defconfig >defconfig
           make
       - name: save results
         uses: actions/upload-artifact@v2
