@@ -22,6 +22,7 @@ jobs:
           curl https://buildroot.org/downloads/buildroot-$BUILDROOT_VERSION.tar.xz | tar -xJ
           cd buildroot-$BUILDROOT_VERSION
           cat ../basedefconfig ../defconfig >defconfig
+          cp ../busybox.config .
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
       # TODO: cache on defconfig changes ?
