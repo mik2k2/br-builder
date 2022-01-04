@@ -28,8 +28,7 @@ jobs:
       - name: add libxml2 to ffmpeg
         run: |
           cd buildroot-$BUILDROOT_VERSION
-          cat "$(sed 1,197p <package/ffmpeg/ffmpeg.mk)" ../ffmpeg_xml "$(sed 197,576p <package/ffmpeg/ffmpeg.mk)" >ffmpeg.mk
-          mv ffmpeg.mk package/ffmpeg
+          patch package/ffmpeg/ffmpeg.mk ../ffmpeg.patch
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |

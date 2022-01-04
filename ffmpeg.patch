@@ -1,0 +1,6 @@
+197a198,202
+> ifeq ($(BR2_PACKAGE_LIBXML2),y)
+> FFMPEG_CONF_OPTS += --enable-libxml2
+> FFMPEG_DEPENDENCIES += libxml2
+> endif
+> 
