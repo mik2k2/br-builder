@@ -15,14 +15,13 @@ jobs:
         uses: actions/cache@v2
         with:
           path: buildroot-${{ env.BUILDROOT_VERSION }}
-          key: ${{ env.BUILDROOT_VERSION }}-${{ hashFiles('basedefconfig') }}
+          key: ${{ env.BUILDROOT_VERSION }}-${{ hashFiles('tcdefconfig') }}
       - name: get Buildroot and build toolchain
         if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
           curl https://buildroot.org/downloads/buildroot-$BUILDROOT_VERSION.tar.xz | tar -xJ
           cd buildroot-$BUILDROOT_VERSION
-          cat ../basedefconfig ../defconfig >defconfig
-          cp ../busybox.config .
+          cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
       - name: add libxml2 to ffmpeg
@@ -33,7 +32,8 @@ jobs:
       - name: build everything
         run: |
           cd buildroot-$BUILDROOT_VERSION
-          cat ../basedefconfig ../defconfig >defconfig
+          cp ../busybox.config .
+          cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make
       - name: save results
