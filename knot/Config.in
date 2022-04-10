@@ -4,6 +4,7 @@ config BR2_PACKAGE_KNOT
 	select BR2_PACKAGE_GNUTLS
 	select BR2_PACKAGE_LIBEDIT
 	select BR2_PACKAGE_LIBURCU
+	select BR2_PACKAGE_LIBLMDB
 	help
 	  Knot DNS is an authoritive DNS server
 	  https://www.knot-dns.cz

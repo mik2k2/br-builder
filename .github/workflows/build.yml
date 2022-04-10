@@ -29,10 +29,12 @@ jobs:
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
-      - name: copy Knot package
+      - name: copy Knot and LMDB packages
         run: |
-          cp -r knot buildroot-$BUILDROOT_VERSION/package
-          sed -i '2247a	source "package/knot/Config.in"' buildroot-$BUILDROOT_VERSION/package/Config.in
+          cp -r knot liblmdb buildroot-$BUILDROOT_VERSION/package
+          sed -i -e '2247a	source "package/knot/Config.in"' \
+                 -e '1443a	source "package/liblmdb/Config.in"' \
+                 buildroot-$BUILDROOT_VERSION/package/Config.in
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
