@@ -29,6 +29,8 @@ jobs:
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
+      - name: copy Knot package
+        run: cp -r knot buildroot-$BUILDROOT_VERSION/package
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
