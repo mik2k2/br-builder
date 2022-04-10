@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LIBLMDB
+	bool "liblmdb"
+	help
+	  The Lightning memory-mapped database
+	  https://www.symas.com/lmdb
