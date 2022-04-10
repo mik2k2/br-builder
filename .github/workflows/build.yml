@@ -27,7 +27,7 @@ jobs:
       - name: copy Knot package
         run: |
           cp -r knot buildroot-$BUILDROOT_VERSION/package
-          sed -i '2247a	source "package/knot/Config.in"'
+          sed -i '2247a	source "package/knot/Config.in"' buildroot-$BUILDROOT_VERSION/package/Config.in
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
