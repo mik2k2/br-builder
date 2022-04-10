@@ -1,0 +1,9 @@
+config BR2_PACKAGE_KNOT
+	bool "knot"
+	depends on BR2_USE_MMU # well, probably?
+	select BR2_PACKAGE_GNUTLS
+	select BR2_PACKAGE_LIBEDIT
+	select BR2_PACKAGE_LIBURCU
+	help
+	  Knot DNS is an authoritive DNS server
+	  https://www.knot-dns.cz
