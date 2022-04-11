@@ -13,7 +13,7 @@ define LIBLMDB_BUILD_CMDS
 endef
 
 define LIBLMDB_INSTALL_TARGET_CMDS
-    $(MAKE) -C $(@D)/libraries/liblmdb install
+    $(MAKE) prefix=$(TARGET_DIR)/usr -C $(@D)/libraries/liblmdb install
 endef
 
 $(eval $(generic-package))
