@@ -12,6 +12,10 @@ define LIBLMDB_BUILD_CMDS
     $(MAKE) $(TARGET_CONFIGURE_OPTS) -C $(@D)/libraries/liblmdb all
 endef
 
+define LIBLMDB_INSTALL_STAGING_CMDS
+    $(MAKE) DESTDIR=$(STAGING_DIR) -C $(@D)/libraries/liblmdb install
+endef
+
 define LIBLMDB_INSTALL_TARGET_CMDS
     $(MAKE) DESTDIR=$(TARGET_DIR) -C $(@D)/libraries/liblmdb install
 endef
