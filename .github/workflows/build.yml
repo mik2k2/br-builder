@@ -30,6 +30,8 @@ jobs:
           sed -i -e '2247a	source "package/knot/Config.in"' \
                  -e '1443a	source "package/liblmdb/Config.in"' \
                  buildroot-$BUILDROOT_VERSION/package/Config.in
+      - name: fast-fail invisible-mirror.net per https://github.com/actions/virtual-environments/issues/2577#issuecomment-845126269
+        run: echo "1.1.1.1 invisible-mirror.net" | sudo tee -a /etc/hosts
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
