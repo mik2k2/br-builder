@@ -28,6 +28,8 @@ jobs:
         run: |
           cd buildroot-$BUILDROOT_VERSION
           patch package/ffmpeg/ffmpeg.mk ../ffmpeg.patch
+      - name: add -readrate option to ffmpeg
+        run: cp 0005-ffmpeg-add-readrate-option.patch buildroot-$BUILDROOT_VERSION/package/ffmpeg
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
