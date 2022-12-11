@@ -1,0 +1,12 @@
+diff --git a/package/unbound/unbound.mk b/package/unbound/unbound.mk
+index 7b625227..50ba73a2 100644
+--- a/package/unbound/unbound.mk
++++ b/package/unbound/unbound.mk
+@@ -12,6 +12,7 @@ UNBOUND_LICENSE = BSD-3-Clause
+ UNBOUND_LICENSE_FILES = LICENSE
+ UNBOUND_CPE_ID_VENDOR = nlnetlabs
+ UNBOUND_CONF_OPTS = \
++	--enable-systemd \
+ 	--disable-rpath \
+ 	--disable-debug \
+ 	--with-conf-file=/etc/unbound/unbound.conf \
