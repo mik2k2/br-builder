@@ -40,5 +40,5 @@ jobs:
       - name: save results
         uses: actions/upload-artifact@v3
         with:
-          name: images
+          name: images-${{ matrix.arch }}
           path: buildroot-${{ env.BUILDROOT_VERSION }}/output/images
