@@ -8,6 +8,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v3
       - name: cache toolchain
@@ -21,6 +24,7 @@ jobs:
         run: |
           curl https://buildroot.org/downloads/buildroot-$BUILDROOT_VERSION.tar.xz | tar -xJ
           cd buildroot-$BUILDROOT_VERSION
+          sed -i s/@arch@/${{ matrix.arch }}/ tcdefconfig
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
