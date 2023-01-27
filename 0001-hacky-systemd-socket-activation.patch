@@ -27,7 +27,6 @@ index 0650937..85ee5c7 100644
 +				continue;
 +			}
 +			if (sockaddr_cmp(addr, &sdaddr, 0) == 0) {
-+				used_systemd_sockets |= 1 << i;
 +				return fd;
 +			}
 +		}
