@@ -49,10 +49,10 @@ index 0650937b1..68b565b79 100644
  	}
 diff --git a/src/contrib/sd-daemon.c b/src/contrib/sd-daemon.c
 new file mode 100644
-index 000000000..6d1f8e948
+index 000000000..62ce3adb6
 --- /dev/null
 +++ b/src/contrib/sd-daemon.c
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,269 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +
 +
@@ -319,27 +319,6 @@ index 000000000..6d1f8e948
 +
 +                return sockaddr.sa.sa_family == family;
 +        }
-+
-+        return 1;
-+}
-+
-+int sd_is_socket_with_addr(int fd, int family, int type, int listening, struct sockaddr_storage *addr, socklen_t addrlen) {
-+        int r;
-+        r = sd_is_socket(fd, family, type, listening);
-+        if (r <= 0)
-+                return r;
-+
-+        union sockaddr_union sockaddr = {};
-+        socklen_t l = sizeof(sockaddr);
-+
-+        if (getsockname(fd, &sockaddr.sa, &l) < 0)
-+                return -errno;
-+
-+        if (l < sizeof(sa_family_t) || l > addrlen)
-+                return -EINVAL;
-+
-+        if (memcmp(&sockaddr, addr, l) < 0)
-+                return -errno;
 +
 +        return 1;
 +}
