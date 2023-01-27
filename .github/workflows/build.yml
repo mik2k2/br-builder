@@ -3,7 +3,7 @@ name: build
 on: [push]
 
 env:
-  BUILDROOT_VERSION: 2022.11
+  BUILDROOT_VERSION: 2022.11.1
 
 jobs:
   build:
@@ -33,8 +33,6 @@ jobs:
       - name: build everything
         run: |
           cd buildroot-$BUILDROOT_VERSION
-          sed -i 's/TOR_VERSION = 0.4.7.8/TOR_VERSION = 0.4.7.10/' package/tor/tor.mk
-          sed -i 's/sha256  9e9a5c67ad2acdd5f0f8be14ed591fed076b1708abf8344066990a0fa66fe195  tor-0.4.7.8.tar.gz/sha256 647e56dfa59ea36dab052027fcfc7663905c826c03509363c456900ecd435a5b  tor-0.4.7.10.tar.gz/' package/tor/tor.hash
           cp ../busybox.config .
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
