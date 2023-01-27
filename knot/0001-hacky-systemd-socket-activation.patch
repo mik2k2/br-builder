@@ -1,5 +1,5 @@
 diff --git a/src/contrib/net.c b/src/contrib/net.c
-index 0650937..85ee5c7 100644
+index 0650937b1..68b565b79 100644
 --- a/src/contrib/net.c
 +++ b/src/contrib/net.c
 @@ -32,6 +32,8 @@
@@ -11,7 +11,7 @@ index 0650937..85ee5c7 100644
  /*!
   * \brief Enable socket option.
   */
-@@ -162,10 +164,35 @@ static void unlink_unix_socket(const struct sockaddr_storage *addr)
+@@ -162,10 +164,34 @@ static void unlink_unix_socket(const struct sockaddr_storage *addr)
  	unlink(path);
  }
  
@@ -49,7 +49,7 @@ index 0650937..85ee5c7 100644
  	}
 diff --git a/src/contrib/sd-daemon.c b/src/contrib/sd-daemon.c
 new file mode 100644
-index 0000000..6d1f8e9
+index 000000000..6d1f8e948
 --- /dev/null
 +++ b/src/contrib/sd-daemon.c
 @@ -0,0 +1,290 @@
