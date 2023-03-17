@@ -13,14 +13,15 @@ index f0f0797f43..5004d20a68 100644
  #  define ENV_GDB " GDB DEBUG_SILENT"
 diff --git a/src/master/sd-daemon.c b/src/master/sd-daemon.c
 new file mode 100644
-index 0000000000..6d1f8e9481
+index 0000000000..fd338785a7
 --- /dev/null
 +++ b/src/master/sd-daemon.c
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,334 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +
-+
++#include <endian.h>
 +#include <errno.h>
++#include <fcntl.h>
 +#include <limits.h>
 +#include <mqueue.h>
 +#include <netinet/in.h>
@@ -33,7 +34,7 @@ index 0000000000..6d1f8e9481
 +#define SD_LISTEN_FDS_START 3
 +
 +#include <stdbool.h>
-+static union sockaddr_union {
++union sockaddr_union {
 +        /* The minimal, abstract version */
 +        struct sockaddr sa;
 +
@@ -306,6 +307,49 @@ index 0000000000..6d1f8e9481
 +                return -errno;
 +
 +        return 1;
++}
++
++static int sockaddr_port(const union sockaddr_union *sa, unsigned *ret_port) {
++	switch (sa->sa.sa_family) {
++		case AF_INET:
++			*ret_port = be16toh(sa->in.sin_port);
++			return 0;
++		case AF_INET6:
++			*ret_port = be16toh(sa->in6.sin6_port);
++			return 0;
++		default:
++			return -EAFNOSUPPORT;
++	}
++}
++
++int sd_is_socket_inet(int fd, int family, int type, int listening, uint16_t port) {
++	union sockaddr_union sockaddr = {};
++	socklen_t l = sizeof(sockaddr);
++
++	int r = is_socket_internal(fd, type, listening);
++	if (r <= 0)
++		return r;
++
++	if (getsockname(fd, &sockaddr.sa, &l) < 0)
++		return -errno;
++
++	if (l < sizeof(sa_family_t))
++		return -EINVAL;
++
++	if (sockaddr.sa.sa_family != AF_INET && sockaddr.sa.sa_family != AF_INET6)
++		return 0;
++
++	if (family != 0 && sockaddr.sa.sa_family != family)
++		return 0;
++
++	if (port > 0) {
++		unsigned sa_port;
++		r = sockaddr_port(&sockaddr, &sa_port);
++		if (r < 0)
++			return r;
++		return port == sa_port;
++	}
++	return 1;
 +}
 diff --git a/src/master/service-listen.c b/src/master/service-listen.c
 index 8237aa0455..fefef6089b 100644
