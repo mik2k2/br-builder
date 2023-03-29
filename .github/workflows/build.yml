@@ -3,7 +3,7 @@ name: build
 on: [push]
 
 env:
-  BUILDROOT_VERSION: 2022.11
+  BUILDROOT_VERSION: 2023.02
 
 jobs:
   build:
