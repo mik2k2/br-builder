@@ -181,7 +181,7 @@ index 85ad7696cc..da15b88c6f 100644
 +
 +            dispatch_conn_new(threadfd, conn_new_cmd,
 +                              EV_READ | EV_PERSIST, READ_BUFFER_CACHED,
-+                              settings.listen_fd_transport, NULL);
++                              settings.listen_fd_transport, NULL, 0, settings.binding_protocol);
 +        }
 +
 +        return 0;
@@ -189,7 +189,7 @@ index 85ad7696cc..da15b88c6f 100644
 +
 +    if (!conn_new(sfd, conn_listening,
 +                  EV_READ | EV_PERSIST, 1,
-+                  settings.listen_fd_transport, main_base, NULL)) {
++                  settings.listen_fd_transport, main_base, NULL, 0, settings.binding_protocol)) {
 +        fprintf(stderr, "failed to create listening connection\n");
 +        exit(EXIT_FAILURE);
 +    }
