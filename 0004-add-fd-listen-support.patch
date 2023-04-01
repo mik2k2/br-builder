@@ -51,9 +51,9 @@ index b6d44773ba..3d9dd5d882 100644
 +    APPEND_STAT("fd", "%d", settings.listen_fd);
 +    APPEND_STAT("fd_transport", "%s",
 +                network_transport_text(settings.listen_fd_transport));
+     APPEND_STAT("shutdown_command", "%s",
+                 settings.shutdown_command ? "yes" : "no");
      APPEND_STAT("growth_factor", "%.2f", settings.factor);
-     APPEND_STAT("chunk_size", "%d", settings.chunk_size);
-     APPEND_STAT("num_threads", "%d", settings.num_threads);
 diff --git a/memcached.h b/memcached.h
 index 1202fa0cfd..8ff4f6f01d 100644
 --- a/memcached.h
