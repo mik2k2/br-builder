@@ -1,0 +1,230 @@
+From a1c17f855bc7c33bf1c62b7e6d570f0caaf7a2ed Mon Sep 17 00:00:00 2001
+From: Kevin Lin <developer@kevinlin.info>
+Date: Thu, 10 Jun 2021 15:55:24 -0700
+Subject: [PATCH 1/3] Add listen_fd, listen_fd_transport to settings
+
+---
+ memcached.c | 21 +++++++++++++++++++++
+ memcached.h |  2 ++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/memcached.c b/memcached.c
+index b6d44773ba..3d9dd5d882 100644
+--- a/memcached.c
++++ b/memcached.c
+@@ -242,6 +242,8 @@ static void settings_init(void) {
+     settings.oldest_live = 0;
+     settings.oldest_cas = 0;          /* supplements accuracy of oldest_live */
+     settings.evict_to_free = 1;       /* push old items out of cache when memory runs out */
++    settings.listen_fd = -1;          /* disabled */
++    settings.listen_fd_transport = local_transport;
+     settings.socketpath = NULL;       /* by default, not using a unix socket */
+     settings.auth_file = NULL;        /* by default, not using ASCII authentication tokens */
+     settings.factor = 1.25;
+@@ -509,6 +511,22 @@ static const char *prot_text(enum protocol prot) {
+     return rv;
+ }
+ 
++static const char *network_transport_text(enum network_transport transport) {
++    char *rv = "unknown";
++    switch (transport) {
++        case local_transport:
++            rv = "local";
++            break;
++        case tcp_transport:
++            rv = "tcp";
++            break;
++        case udp_transport:
++            rv = "udp";
++            break;
++    }
++    return rv;
++}
++
+ void conn_close_idle(conn *c) {
+     if (settings.idle_timeout > 0 &&
+         (current_time - c->last_cmd_time) > settings.idle_timeout) {
+@@ -1819,6 +1837,9 @@ void process_stat_settings(ADD_STAT add_stats, void *c) {
+     APPEND_STAT("domain_socket", "%s",
+                 settings.socketpath ? settings.socketpath : "NULL");
+     APPEND_STAT("umask", "%o", settings.access);
++    APPEND_STAT("fd", "%d", settings.listen_fd);
++    APPEND_STAT("fd_transport", "%s",
++                network_transport_text(settings.listen_fd_transport));
+     APPEND_STAT("growth_factor", "%.2f", settings.factor);
+     APPEND_STAT("chunk_size", "%d", settings.chunk_size);
+     APPEND_STAT("num_threads", "%d", settings.num_threads);
+diff --git a/memcached.h b/memcached.h
+index 1202fa0cfd..8ff4f6f01d 100644
+--- a/memcached.h
++++ b/memcached.h
+@@ -411,6 +411,8 @@ struct settings {
+     rel_time_t oldest_live; /* ignore existing items older than this */
+     uint64_t oldest_cas; /* ignore existing items with CAS values lower than this */
+     int evict_to_free;
++    int listen_fd; /* file descriptor on which to listen for connections */
++    enum network_transport listen_fd_transport; /* transport associated with the fd listener */
+     char *socketpath;   /* path to unix socket if using local socket */
+     char *auth_file;    /* path to user authentication file */
+     int access;  /* access mask (a la chmod) for unix domain socket */
+
+From f2e28dd120314bb553fd8960f2d73410a5f922b4 Mon Sep 17 00:00:00 2001
+From: Kevin Lin <developer@kevinlin.info>
+Date: Thu, 10 Jun 2021 17:14:38 -0700
+Subject: [PATCH 2/3] --fd, --fd-transport command line options
+
+---
+ memcached.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/memcached.c b/memcached.c
+index 3d9dd5d882..85ad7696cc 100644
+--- a/memcached.c
++++ b/memcached.c
+@@ -3826,6 +3826,9 @@ static void usage(void) {
+     printf("-a, --unix-mask=<mask>    access mask for UNIX socket, in octal (default: %o)\n",
+             settings.access);
+ #endif /* #ifndef DISABLE_UNIX_SOCKET */
++    printf("-j  --fd=<num>            file descriptor to listen on (disables network support)\n"
++           "-J  --fd-transport=<name> network transport used by the file descriptor listener;\n"
++           "                          one of local, tcp, or udp\n");
+     printf("-A, --enable-shutdown     enable ascii \"shutdown\" command\n");
+     printf("-l, --listen=<addr>       interface to listen on (default: INADDR_ANY)\n");
+ #ifdef TLS
+@@ -4713,6 +4716,8 @@ int main (int argc, char **argv) {
+           "p:"  /* TCP port number to listen on */
+           "s:"  /* unix socket path to listen on */
+           "U:"  /* UDP port number to listen on */
++          "j:"  /* bound file descriptor to listen on */
++          "J:"  /* network transport for the file descriptor listener */
+           "m:"  /* max memory to use for items in megabytes */
+           "M"   /* return error on memory exhausted */
+           "c:"  /* max simultaneous connections */
+@@ -4753,6 +4758,8 @@ int main (int argc, char **argv) {
+         {"port", required_argument, 0, 'p'},
+         {"unix-socket", required_argument, 0, 's'},
+         {"udp-port", required_argument, 0, 'U'},
++        {"fd", required_argument, 0, 'j'},
++        {"fd-transport", required_argument, 0, 'J'},
+         {"memory-limit", required_argument, 0, 'm'},
+         {"disable-evictions", no_argument, 0, 'M'},
+         {"conn-limit", required_argument, 0, 'c'},
+@@ -4830,6 +4837,21 @@ int main (int argc, char **argv) {
+             exit(EX_USAGE);
+ #endif /* #ifndef DISABLE_UNIX_SOCKET */
+             break;
++        case 'j':
++            settings.listen_fd = atoi(optarg);
++            break;
++        case 'J':
++            if (!strncmp(optarg, "local", 5)) {
++                settings.listen_fd_transport = local_transport;
++            } else if (!strncmp(optarg, "tcp", 3)) {
++                settings.listen_fd_transport = tcp_transport;
++            } else if (!strncmp(optarg, "udp", 3)) {
++                settings.listen_fd_transport = udp_transport;
++            } else {
++                fprintf(stderr, "Unknown transport type; use one of local, tcp, or udp\n");
++                exit(EX_USAGE);
++            }
++            break;
+         case 'm':
+             settings.maxbytes = ((size_t)atoi(optarg)) * 1024 * 1024;
+             break;
+@@ -5539,6 +5561,14 @@ int main (int argc, char **argv) {
+         settings.port = settings.udpport;
+     }
+ 
++    if (settings.listen_fd != -1) {
++        if (fcntl(settings.listen_fd, F_GETFD) < 0) {
++            fprintf(stderr, "Invalid listen file descriptor: %s\n",
++                    strerror(errno));
++            exit(EX_USAGE);
++        }
++    }
++
+ 
+ #ifdef TLS
+     /*
+
+From 818ddffdb0cea1d6ac8da92fe6ed97198004f0e0 Mon Sep 17 00:00:00 2001
+From: Kevin Lin <developer@kevinlin.info>
+Date: Thu, 10 Jun 2021 17:16:36 -0700
+Subject: [PATCH 3/3] server_socket_fd for FD listener
+
+---
+ memcached.c | 48 +++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 43 insertions(+), 5 deletions(-)
+
+diff --git a/memcached.c b/memcached.c
+index 85ad7696cc..da15b88c6f 100644
+--- a/memcached.c
++++ b/memcached.c
+@@ -3727,6 +3727,39 @@ static int server_socket_unix(const char *path, int access_mask) {
+ #define server_socket_unix(path, access_mask)   -1
+ #endif /* #ifndef DISABLE_UNIX_SOCKET */
+ 
++static int server_socket_fd(int sfd, enum network_transport transport) {
++    struct sockaddr_in addr;
++
++    memset(&addr, 0, sizeof(struct sockaddr_in));
++
++    if (settings.listen_fd_transport == local_transport) {
++        for (int i = 0; i < settings.num_threads; i++) {
++            int threadfd;
++
++            if (i == 0) {
++                threadfd = sfd;
++            } else {
++                threadfd = dup(sfd);
++            }
++
++            dispatch_conn_new(threadfd, conn_new_cmd,
++                              EV_READ | EV_PERSIST, READ_BUFFER_CACHED,
++                              settings.listen_fd_transport, NULL);
++        }
++
++        return 0;
++    }
++
++    if (!conn_new(sfd, conn_listening,
++                  EV_READ | EV_PERSIST, 1,
++                  settings.listen_fd_transport, main_base, NULL)) {
++        fprintf(stderr, "failed to create listening connection\n");
++        exit(EXIT_FAILURE);
++    }
++
++    return 0;
++}
++
+ /*
+  * We keep the current time of day in a global variable that's updated by a
+  * timer event. This saves us a bunch of time() system calls (we really only
+@@ -5882,17 +5915,22 @@ int main (int argc, char **argv) {
+ #endif
+     clock_handler(0, 0, 0);
+ 
+-    /* create unix mode sockets after dropping privileges */
+     if (settings.socketpath != NULL) {
++        /* create unix mode sockets after dropping privileges */
+         errno = 0;
+         if (server_socket_unix(settings.socketpath,settings.access)) {
+             vperror("failed to listen on UNIX socket: %s", settings.socketpath);
+             exit(EX_OSERR);
+         }
+-    }
+-
+-    /* create the listening socket, bind it, and init */
+-    if (settings.socketpath == NULL) {
++    } else if (settings.listen_fd != -1) {
++        /* listen directly on a bound file descriptor */
++        if (server_socket_fd(settings.listen_fd, settings.listen_fd_transport)) {
++            vperror("failed to listen on file descriptor: %d (%s)",
++                    settings.listen_fd, network_transport_text(settings.listen_fd_transport));
++            exit(EX_OSERR);
++        }
++    } else {
++        /* create the listening socket, bind it, and init */
+         const char *portnumber_filename = getenv("MEMCACHED_PORT_FILENAME");
+         char *temp_portnumber_filename = NULL;
+         size_t len;
