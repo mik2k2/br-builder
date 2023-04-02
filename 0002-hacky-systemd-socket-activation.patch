@@ -1,5 +1,5 @@
 diff --git a/src/lib-master/master-service-settings.c b/src/lib-master/master-service-settings.c
-index b7afdeb..5038ea1 100644
+index f0f0797..5004d20 100644
 --- a/src/lib-master/master-service-settings.c
 +++ b/src/lib-master/master-service-settings.c
 @@ -65,7 +65,7 @@ static const struct setting_define master_service_setting_defines[] = {
@@ -369,7 +369,7 @@ index 0000000..8689ccb
 +	return 1;
 +}
 diff --git a/src/master/service-listen.c b/src/master/service-listen.c
-index db29aba..5f04e23 100644
+index 8237aa0..d841c67 100644
 --- a/src/master/service-listen.c
 +++ b/src/master/service-listen.c
 @@ -7,6 +7,8 @@
@@ -381,19 +381,19 @@ index db29aba..5f04e23 100644
  #include "service.h"
  #include "service-listen.h"
  
-@@ -59,6 +61,11 @@ int service_unix_listener_listen(struct service_listener *l, const char *path,
+@@ -58,6 +60,11 @@ static int service_unix_listener_listen(struct service_listener *l)
  	mode_t old_umask;
  	int fd, i;
  
-+	if (systemd_listen_fd_unix(path, &fd, error_r) < 0)
++	if (systemd_listen_fd_unix(set->path, &fd) < 0)
 +		return -1;
 +
 +	if (fd == -1)
 +	{
  	old_umask = umask((set->mode ^ 0777) & 0777);
  	for (i = 0;; i++) {
- 		fd = net_listen_unix(path, service_get_backlog(service));
-@@ -101,6 +108,7 @@ int service_unix_listener_listen(struct service_listener *l, const char *path,
+ 		fd = net_listen_unix(set->path, service_get_backlog(service));
+@@ -100,6 +107,7 @@ static int service_unix_listener_listen(struct service_listener *l)
  		i_close_fd(&fd);
  		return -1;
  	}
@@ -401,21 +401,20 @@ index db29aba..5f04e23 100644
  	net_set_nonblock(fd, TRUE);
  	fd_close_on_exec(fd, TRUE);
  
-@@ -152,12 +160,8 @@ service_fifo_listener_listen(struct service_listener *l, const char **error_r)
+@@ -151,11 +159,8 @@ static int service_fifo_listener_listen(struct service_listener *l)
  }
  
  #ifdef HAVE_LIBSYSTEMD
 -static int
--systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r,
--		  const char **error_r)
+-systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r)
 -{
-+static int systemd_listen_fd_max(int *fd_max_r, const char **error_r) {
++static int systemd_listen_fd_max(int *fd_max_r) {
  	static int sd_fds = -1;
 -	int fd, fd_max;
  
  	if (sd_fds < 0) {
  		sd_fds = sd_listen_fds(0);
-@@ -168,7 +172,18 @@ systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r,
+@@ -165,7 +170,17 @@ systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r)
  		}
  	}
  
@@ -425,24 +424,23 @@ index db29aba..5f04e23 100644
 +}
 +
 +static int
-+systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r,
-+		  const char **error_r)
++systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r)
 +{
 +	int fd, fd_max;
-+	if (systemd_listen_fd_max(&fd_max, error_r) < 0) {
++	if (systemd_listen_fd_max(&fd_max) < 0) {
 +		return -1;
 +	}
  	for (fd = SD_LISTEN_FDS_START; fd <= fd_max; fd++) {
  		if (sd_is_socket_inet(fd, ip->family, SOCK_STREAM, 1, port) > 0) {
  			*fd_r = fd;
-@@ -180,6 +195,21 @@ systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r,
+@@ -177,6 +192,21 @@ systemd_listen_fd(const struct ip_addr *ip, in_port_t port, int *fd_r)
  	*fd_r = -1;
  	return 0;
  }
 +
-+static int systemd_listen_fd_unix(const char *path, int *fd_r, const char **error_r) {
++static int systemd_listen_fd_unix(const char *path, int *fd_r) {
 +	int fd, fd_max;
-+	if (systemd_listen_fd_max(&fd_max, error_r) < 0) {
++	if (systemd_listen_fd_max(&fd_max) < 0) {
 +		return -1;
 +	}
 +	for (fd = SD_LISTEN_FDS_START; fd <= fd_max; fd++) {
@@ -456,4 +454,4 @@ index db29aba..5f04e23 100644
 +}
  #endif
  
- static int
+ static int service_inet_listener_listen(struct service_listener *l)
