@@ -1,0 +1,16 @@
+diff -r 77d5c662f3d9 src/core/nginx.c
+--- a/src/core/nginx.c	Tue Apr 18 06:28:46 2023 +0300
++++ b/src/core/nginx.c	Sun Apr 23 22:37:27 2023 +0200
+@@ -373,6 +373,12 @@
+                           ngx_close_file_n " built-in log failed");
+         }
+     }
++    for (ngx_log_t *log = cycle->log; log != NULL; log = log->next) {
++    	if (log->file && log->file->fd == ngx_stderr) {
++    		log->log_level = NGX_LOG_STDERR;
++    		break;
++    	}
++    }
+ 
+     ngx_use_stderr = 0;
+ 
