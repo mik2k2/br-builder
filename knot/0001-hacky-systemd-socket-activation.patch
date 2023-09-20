@@ -34,7 +34,8 @@ index 0650937b1..68b565b79 100644
 +	return -1;
 +}
 +
- int net_bound_socket(int type, const struct sockaddr_storage *addr, net_bind_flag_t flags)
+ int net_bound_socket(int type, const struct sockaddr_storage *addr,
+                      net_bind_flag_t flags, mode_t unix_mode)
  {
 +	int sock;
 +	if ((sock = get_systemd_socket(addr->ss_family, type, addr)) > 0) {
