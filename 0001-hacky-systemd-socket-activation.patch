@@ -76,15 +76,6 @@ index 95606af..06f469b 100644
  	listen_pid = getenv("LISTEN_PID");
  	listen_fds = getenv("LISTEN_FDS");
  
-@@ -187,7 +178,7 @@ systemd_get_activated(int family, int socktype, int listen,
- 			log_err("systemd sd_listen_fds(): %s", strerror(-r));
- 		return -1;
- 	}
--	
-+
- 	for(i = 0; i < r; i++) {
- 		if(sd_is_socket(SD_LISTEN_FDS_START + i, family, socktype, listen)) {
- 			s = SD_LISTEN_FDS_START + i;
 @@ -983,6 +974,7 @@ err:
  	return -1;
  
