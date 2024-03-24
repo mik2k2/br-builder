@@ -3,7 +3,7 @@ name: build
 on: [push]
 
 env:
-  BUILDROOT_VERSION: 2023.11
+  BUILDROOT_VERSION: 2024.02
 
 jobs:
   build:
@@ -38,6 +38,7 @@ jobs:
       - name: build everything
         run: |
           cd buildroot-$BUILDROOT_VERSION
+          cp ../0009-bb-syslogd-socket-activation.patch package/busybox
           cp ../busybox.config .
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig

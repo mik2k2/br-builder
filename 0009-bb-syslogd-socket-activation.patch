@@ -1,0 +1,427 @@
+commit be69044db745bd376eba8bef544a9abfcbbd2817
+Author: mikitsu <srht@mikitsu.me>
+Date:   Mon Jan 1 21:28:53 2024 +0100
+
+    add hacky systemd socket activation
+
+diff --git a/include/sd-daemon.h b/include/sd-daemon.h
+new file mode 100644
+index 000000000..676abc7b3
+--- /dev/null
++++ b/include/sd-daemon.h
+@@ -0,0 +1,6 @@
++#define SD_LISTEN_FDS_START 3
++
++int sd_listen_fds(int unset_environment);
++int sd_is_socket(int fd, int family, int type, int listening);
++int sd_is_socket_inet(int fd, int family, int type, int listening, uint16_t port);
++int sd_is_socket_unix(int fd, int type, int listening, const char *path, size_t length);
+diff --git a/sysklogd/sd-daemon.c b/sysklogd/sd-daemon.c
+new file mode 100644
+index 000000000..634a82800
+--- /dev/null
++++ b/sysklogd/sd-daemon.c
+@@ -0,0 +1,353 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++#include <endian.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <limits.h>
++#include <mqueue.h>
++#include <netinet/in.h>
++#include <stdio.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <sys/stat.h>
++#include <sys/un.h>
++#include <unistd.h>
++
++#include "sd-daemon.h"
++
++#define SD_LISTEN_FDS_START 3
++
++#include <stdbool.h>
++union sockaddr_union {
++        /* The minimal, abstract version */
++        struct sockaddr sa;
++
++        /* The libc provided version that allocates "enough room" for every protocol */
++        struct sockaddr_storage storage;
++
++        /* Protoctol-specific implementations */
++        struct sockaddr_in in;
++        struct sockaddr_in6 in6;
++        struct sockaddr_un un;
++
++        /* Ensure there is enough space after the AF_UNIX sun_path for one more NUL byte, just to be sure that the path
++         * component is always followed by at least one NUL byte. */
++        uint8_t un_buffer[sizeof(struct sockaddr_un) + 1];
++};
++
++static int safe_atoi(const char *s, int *ret_i) {
++        unsigned base = 10;
++        char *x = NULL;
++        long l;
++
++        errno = 0;
++        l = strtol(s, &x, base);
++        if (errno > 0)
++                return -errno;
++        if (!x || x == s || *x != 0)
++                return -EINVAL;
++        if ((long) (int) l != l)
++                return -ERANGE;
++
++        if (ret_i)
++                *ret_i = (int) l;
++
++        return 0;
++}
++
++static int safe_atollu_full(const char *s, unsigned base, unsigned long long *ret_llu) {
++        char *x = NULL;
++        unsigned long long l;
++
++        errno = 0;
++        l = strtoull(s, &x, base);
++        if (errno > 0)
++                return -errno;
++        if (!x || x == s || *x != 0)
++                return -EINVAL;
++        if (l != 0 && s[0] == '-')
++                return -ERANGE;
++
++        if (ret_llu)
++                *ret_llu = l;
++
++        return 0;
++}
++
++static int safe_atou_full(const char *s, unsigned base, unsigned *ret_u) {
++        char *x = NULL;
++        unsigned long l;
++
++        errno = 0;
++        l = strtoul(s, &x, base);
++        if (errno > 0)
++                return -errno;
++        if (!x || x == s || *x != 0)
++                return -EINVAL;
++        if (l != 0 && s[0] == '-')
++                return -ERANGE;
++        if ((unsigned long) (unsigned) l != l)
++                return -ERANGE;
++
++        if (ret_u)
++                *ret_u = (unsigned) l;
++
++        return 0;
++}
++
++#if LONG_MAX == INT_MAX
++static inline int safe_atolu_full(const char *s, unsigned base, unsigned long *ret_u) {
++        return safe_atou_full(s, base, (unsigned*) ret_u);
++}
++#else
++static inline int safe_atolu_full(const char *s, unsigned base, unsigned long *ret_u) {
++        return safe_atollu_full(s, base, (unsigned long long*) ret_u);
++}
++#endif
++
++static inline int safe_atolu(const char *s, unsigned long *ret_u) {
++        return safe_atolu_full(s, 10, ret_u);
++}
++
++
++static inline int RET_NERRNO(int ret) {
++        if (ret < 0)
++                return -errno;
++        return ret;
++}
++
++static int fd_cloexec(int fd) {
++        int flags, nflags;
++
++        flags = fcntl(fd, F_GETFD, 0);
++        if (flags < 0)
++                return -errno;
++
++        nflags = flags | FD_CLOEXEC;
++        if (nflags == flags)
++                return 0;
++
++        return RET_NERRNO(fcntl(fd, F_SETFD, nflags));
++}
++
++static int parse_pid(const char *s, pid_t* ret_pid) {
++        unsigned long ul = 0;
++        pid_t pid;
++        int r;
++
++        r = safe_atolu(s, &ul);
++        if (r < 0)
++                return r;
++
++        pid = (pid_t) ul;
++
++        if ((unsigned long) pid != ul)
++                return -ERANGE;
++
++        if (pid <= 0)
++                return -ERANGE;
++
++        *ret_pid = pid;
++        return 0;
++}
++
++static void unsetenv_all(bool unset_environment) {
++        if (!unset_environment)
++                return;
++
++        unsetenv("LISTEN_PID");
++        unsetenv("LISTEN_FDS");
++        unsetenv("LISTEN_FDNAMES");
++}
++
++int sd_listen_fds(int unset_environment) {
++        const char *e;
++        int n, r;
++        pid_t pid;
++
++        e = getenv("LISTEN_PID");
++        if (!e) {
++                r = 0;
++                goto finish;
++        }
++
++        r = parse_pid(e, &pid);
++        if (r < 0)
++                goto finish;
++
++        /* Is this for us? */
++        if (getpid() != pid) {
++                r = 0;
++                goto finish;
++        }
++
++        e = getenv("LISTEN_FDS");
++        if (!e) {
++                r = 0;
++                goto finish;
++        }
++
++        r = safe_atoi(e, &n);
++        if (r < 0)
++                goto finish;
++
++        if (n <= 0 || n > INT_MAX - SD_LISTEN_FDS_START) {
++                r = -EINVAL;
++                goto finish;
++        }
++
++        for (int fd = SD_LISTEN_FDS_START; fd < SD_LISTEN_FDS_START + n; fd ++) {
++                r = fd_cloexec(fd);
++                if (r < 0)
++                        goto finish;
++        }
++
++        r = n;
++
++finish:
++        unsetenv_all(unset_environment);
++        return r;
++}
++
++static int is_socket_internal(int fd, int type, int listening) {
++        struct stat st_fd;
++
++        if (fstat(fd, &st_fd) < 0)
++                return -errno;
++
++        if (!S_ISSOCK(st_fd.st_mode))
++                return 0;
++
++        if (type != 0) {
++                int other_type = 0;
++                socklen_t l = sizeof(other_type);
++
++                if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &other_type, &l) < 0)
++                        return -errno;
++
++                if (l != sizeof(other_type))
++                        return -EINVAL;
++
++                if (other_type != type)
++                        return 0;
++        }
++
++        if (listening >= 0) {
++                int accepting = 0;
++                socklen_t l = sizeof(accepting);
++
++                if (getsockopt(fd, SOL_SOCKET, SO_ACCEPTCONN, &accepting, &l) < 0)
++                        return -errno;
++
++                if (l != sizeof(accepting))
++                        return -EINVAL;
++
++                if (!accepting != !listening)
++                        return 0;
++        }
++
++        return 1;
++}
++
++int sd_is_socket(int fd, int family, int type, int listening) {
++        int r;
++
++        r = is_socket_internal(fd, type, listening);
++        if (r <= 0)
++                return r;
++
++        if (family > 0) {
++                union sockaddr_union sockaddr = {};
++                socklen_t l = sizeof(sockaddr);
++
++                if (getsockname(fd, &sockaddr.sa, &l) < 0)
++                        return -errno;
++
++                if (l < sizeof(sa_family_t))
++                        return -EINVAL;
++
++                return sockaddr.sa.sa_family == family;
++        }
++
++        return 1;
++}
++
++static int sockaddr_port(const union sockaddr_union *sa, unsigned *ret_port) {
++	switch (sa->sa.sa_family) {
++		case AF_INET:
++			*ret_port = be16toh(sa->in.sin_port);
++			return 0;
++		case AF_INET6:
++			*ret_port = be16toh(sa->in6.sin6_port);
++			return 0;
++		default:
++			return -EAFNOSUPPORT;
++	}
++}
++
++int sd_is_socket_inet(int fd, int family, int type, int listening, uint16_t port) {
++	union sockaddr_union sockaddr = {};
++	socklen_t l = sizeof(sockaddr);
++
++	int r = is_socket_internal(fd, type, listening);
++	if (r <= 0)
++		return r;
++
++	if (getsockname(fd, &sockaddr.sa, &l) < 0)
++		return -errno;
++
++	if (l < sizeof(sa_family_t))
++		return -EINVAL;
++
++	if (sockaddr.sa.sa_family != AF_INET && sockaddr.sa.sa_family != AF_INET6)
++		return 0;
++
++	if (family != 0 && sockaddr.sa.sa_family != family)
++		return 0;
++
++	if (port > 0) {
++		unsigned sa_port;
++		r = sockaddr_port(&sockaddr, &sa_port);
++		if (r < 0)
++			return r;
++		return port == sa_port;
++	}
++	return 1;
++}
++
++int sd_is_socket_unix(int fd, int type, int listening, const char *path, size_t length) {
++	union sockaddr_union sockaddr = {};
++	socklen_t l = sizeof(sockaddr);
++
++	int r = is_socket_internal(fd, type, listening);
++	if (r <= 0)
++		return r;
++
++	if (getsockname(fd, &sockaddr.sa, &l) < 0)
++		return -errno;
++
++	if (l < sizeof(sa_family_t))
++		return -EINVAL;
++
++	if (sockaddr.sa.sa_family != AF_UNIX)
++		return 0;
++
++	if (path) {
++		if (length == 0)
++			length = strlen(path);
++
++		if (length == 0)
++			return l == offsetof(struct sockaddr_un, sun_path);
++
++		if (path[0])
++			return
++				(l >= offsetof(struct sockaddr_un, sun_path) + length + 1)
++				&& memcmp(path, sockaddr.un.sun_path, length+1) == 0;
++		else
++			return
++				(l == offsetof(struct sockaddr_un, sun_path) + length)
++				&& memcmp(path, sockaddr.un.sun_path, length) == 0;
++	}
++
++	return 1;
++}
+diff --git a/sysklogd/syslogd.c b/sysklogd/syslogd.c
+index 6ddfd771a..5fc341e62 100644
+--- a/sysklogd/syslogd.c
++++ b/sysklogd/syslogd.c
+@@ -119,7 +119,7 @@
+ 
+ //applet:IF_SYSLOGD(APPLET(syslogd, BB_DIR_SBIN, BB_SUID_DROP))
+ 
+-//kbuild:lib-$(CONFIG_SYSLOGD) += syslogd_and_logger.o
++//kbuild:lib-$(CONFIG_SYSLOGD) += syslogd_and_logger.o sd-daemon.o
+ 
+ //usage:#define syslogd_trivial_usage
+ //usage:       "[OPTIONS]"
+@@ -167,6 +167,7 @@
+ #define SYSLOG_NAMES_CONST
+ #include <syslog.h>
+ */
++#include "sd-daemon.h"
+ #ifndef _PATH_LOG
+ #define _PATH_LOG	"/dev/log"
+ #endif
+@@ -955,6 +956,16 @@ static void do_mark(int sig)
+ 	}
+ }
+ #endif
++static int get_systemd_socket(const char *path) {
++	int nsocks = sd_listen_fds(0);
++	for (int i=0; i < nsocks; i++) {
++		int fd = i + SD_LISTEN_FDS_START;
++		if (sd_is_socket_unix(fd, SOCK_DGRAM, -1, path, 0) > 0) {
++			return fd;
++		}
++	}
++	return -1;
++}
+ 
+ /* Don't inline: prevent struct sockaddr_un to take up space on stack
+  * permanently */
+@@ -975,6 +986,11 @@ static NOINLINE int create_socket(void)
+ 		safe_strncpy(sunx.sun_path, dev_log_name, sizeof(sunx.sun_path));
+ 		free(dev_log_name);
+ 	}
++
++	if ((sock_fd = get_systemd_socket(sunx.sun_path)) >= 0) {
++		return sock_fd;
++	}
++
+ 	unlink(sunx.sun_path);
+ 
+ 	sock_fd = xsocket(AF_UNIX, SOCK_DGRAM, 0);
