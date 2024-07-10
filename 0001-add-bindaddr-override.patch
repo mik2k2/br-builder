@@ -1,29 +1,40 @@
 diff --git a/cmd/lyrebird/lyrebird.go b/cmd/lyrebird/lyrebird.go
-index 14943a9..f7016c4 100644
+index 14943a9..ca7e7a0 100644
 --- a/cmd/lyrebird/lyrebird.go
 +++ b/cmd/lyrebird/lyrebird.go
 @@ -177,6 +177,13 @@ func clientHandler(f base.ClientFactory, conn net.Conn, proxyURI *url.URL) {
  }
  
  func serverSetup() (launched bool, listeners []net.Listener) {
-+	var overrideBindAddr *net.TCPAddr
-+	if val := os.Getenv("LYREBIRD_OVERRIDE_BIND_ADDR"); val != "" {
++	var overrideAddr net.Addr
++	if val := os.Getenv("LYREBIRD_OVERRIDE_REPORTED_ADDR"); val != "" {
 +		var err error
-+		if overrideBindAddr, err = net.ResolveTCPAddr("tcp", val); err != nil {
++		if overrideAddr, err = net.ResolveTCPAddr("tcp", val); err != nil {
 +			golog.Fatal(err)
 +		}
 +	}
  	ptServerInfo, err := pt.ServerSetup(transports.Transports())
  	if err != nil {
  		golog.Fatal(err)
-@@ -197,6 +204,10 @@ func serverSetup() (launched bool, listeners []net.Listener) {
- 			continue
+@@ -206,13 +213,18 @@ func serverSetup() (launched bool, listeners []net.Listener) {
+ 		go func() {
+ 			_ = serverAcceptLoop(f, ln, &ptServerInfo)
+ 		}()
++		if overrideAddr == nil {
++			overrideAddr = ln.Addr()
++		} else {
++			log.Infof("%s - will override addr %s with %s", name, log.ElideAddr(ln.Addr().String()), log.ElideAddr(overrideAddr.String()))
++		}
+ 		if args := f.Args(); args != nil {
+-			pt.SmethodArgs(name, ln.Addr(), *args)
++			pt.SmethodArgs(name, overrideAddr, *args)
+ 		} else {
+-			pt.SmethodArgs(name, ln.Addr(), nil)
++			pt.SmethodArgs(name, overrideAddr, nil)
  		}
  
-+		if overrideBindAddr != nil {
-+			// a grep suggests that this is really only used for binding
-+			bindaddr.Addr = overrideBindAddr
-+		}
- 		ln, err := net.ListenTCP("tcp", bindaddr.Addr)
- 		if err != nil {
- 			_ = pt.SmethodError(name, err.Error())
+-		log.Infof("%s - registered listener: %s", name, log.ElideAddr(ln.Addr().String()))
++		log.Infof("%s - registered listener: %s", name, log.ElideAddr(overrideAddr.String()))
+ 
+ 		listeners = append(listeners, ln)
+ 		launched = true
