@@ -6,6 +6,7 @@ LYREBIRD_SITE = https://gitlab.torproject.org/tpo/anti-censorship/pluggable-tran
 LYREBIRD_LICENSE = BSD-2-Cluase, BSD-3-Clause, GPL-3.0+
 LYREBIRD_LICENSE_FILES = LICENSE LICENSE-GPL3.txt
 
+LYREBIRD_GOMOD = gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/lyrebird
 LYREBIRD_BUILD_TARGETS = cmd/lyrebird
 
 $(eval $(golang-package))
