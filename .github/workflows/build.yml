@@ -34,6 +34,8 @@ jobs:
           cp -r lyrebird buildroot-$BUILDROOT_VERSION/package
           sed -i -e '2602a	source "package/lyrebird/Config.in"' \
                  buildroot-$BUILDROOT_VERSION/package/Config.in
+      - name: add binaddr override patch
+        run: cp 0001-add-bindaddr-override.patch buildroot-$BUILDROOT_VERSION/package/lyrebird/
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |

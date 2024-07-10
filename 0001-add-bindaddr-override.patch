@@ -1,0 +1,29 @@
+diff --git a/cmd/lyrebird/lyrebird.go b/cmd/lyrebird/lyrebird.go
+index 14943a9..f7016c4 100644
+--- a/cmd/lyrebird/lyrebird.go
++++ b/cmd/lyrebird/lyrebird.go
+@@ -177,6 +177,13 @@ func clientHandler(f base.ClientFactory, conn net.Conn, proxyURI *url.URL) {
+ }
+ 
+ func serverSetup() (launched bool, listeners []net.Listener) {
++	var overrideBindAddr *net.TCPAddr
++	if val := os.Getenv("LYREBIRD_OVERRIDE_BIND_ADDR"); val != "" {
++		var err error
++		if overrideBindAddr, err = net.ResolveTCPAddr("tcp", val); err != nil {
++			golog.Fatal(err)
++		}
++	}
+ 	ptServerInfo, err := pt.ServerSetup(transports.Transports())
+ 	if err != nil {
+ 		golog.Fatal(err)
+@@ -197,6 +204,10 @@ func serverSetup() (launched bool, listeners []net.Listener) {
+ 			continue
+ 		}
+ 
++		if overrideBindAddr != nil {
++			// a grep suggests that this is really only used for binding
++			bindaddr.Addr = overrideBindAddr
++		}
+ 		ln, err := net.ListenTCP("tcp", bindaddr.Addr)
+ 		if err != nil {
+ 			_ = pt.SmethodError(name, err.Error())
