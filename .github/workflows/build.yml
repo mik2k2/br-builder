@@ -29,6 +29,11 @@ jobs:
           cat ../tcdefconfig ../basedefconfig ../defconfig >defconfig
           make BR2_DEFCONFIG=defconfig defconfig
           make toolchain
+      - name: copy lyrebird package
+        run: |
+          cp -r lyrebird buildroot-$BUILDROOT_VERSION/package
+          sed -i -e '2602a	source "package/lyrebird/Config.in"' \
+                 buildroot-$BUILDROOT_VERSION/package/Config.in
       # TODO: cache on defconfig changes ?
       - name: build everything
         run: |
